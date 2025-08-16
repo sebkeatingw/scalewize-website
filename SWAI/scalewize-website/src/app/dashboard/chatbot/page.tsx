@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { MessageSquare, Settings, Users, Zap, Loader2 } from 'lucide-react'
-// import { libreChatAuth } from '@/lib/librechat-auth' // No longer needed for URL
+import { MessageSquare, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase-client';
 
 export default function ChatbotPage() {
-  const { user, organization } = useAuth()
+  const { user, organization, profile } = useAuth()
   const [libreChatUrl, setLibreChatUrl] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [isVisible, setIsVisible] = useState(true)
 
   useEffect(() => {
     const getLibreChatSession = async () => {
@@ -43,37 +45,22 @@ export default function ChatbotPage() {
     getLibreChatSession()
   }, [user, organization])
 
-  // Mock data for chatbot stats
-  const chatbotStats = [
-    {
-      name: 'Active Sessions',
-      value: '12',
-      change: '+2',
-      changeType: 'positive',
-      icon: MessageSquare,
-    },
-    {
-      name: 'Messages Today',
-      value: '1,234',
-      change: '+15%',
-      changeType: 'positive',
-      icon: MessageSquare,
-    },
-    {
-      name: 'Tokens Used',
-      value: '23.4K',
-      change: '+8%',
-      changeType: 'positive',
-      icon: Zap,
-    },
-    {
-      name: 'Connected Users',
-      value: '8',
-      change: '+1',
-      changeType: 'positive',
-      icon: Users,
-    },
-  ]
+  // Handle iframe load event
+  const handleIframeLoad = () => {
+    setIframeLoaded(true)
+  }
+
+  // Keep iframe loaded even when tab is not visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsVisible(document.visibilityState === 'visible')
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
 
   // Debug prints
   console.log('user:', user);
@@ -87,7 +74,9 @@ export default function ChatbotPage() {
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-medium text-gray-900">Chat Interface</h3>
+              <h3 className="text-lg font-medium text-gray-900">
+                {organization?.name || 'AI'} Chatbot
+              </h3>
               <p className="text-sm text-gray-600">
                 Powered by ScaleWize AI - Connected to your business systems and databases
               </p>
@@ -121,49 +110,23 @@ export default function ChatbotPage() {
             </div>
           ) : libreChatUrl ? (
             <iframe
+              ref={iframeRef}
               src={`${libreChatUrl}`}
               className="w-full h-full rounded-b-lg"
               title="ScaleWize AI Chatbot"
               frameBorder="0"
+              onLoad={handleIframeLoad}
+              style={{ 
+                display: iframeLoaded ? 'block' : 'none',
+                opacity: isVisible ? 1 : 0.99, // Keep iframe active but slightly transparent when not visible
+                transition: 'opacity 0.2s ease-in-out'
+              }}
             />
           ) : (
             <div className="flex items-center justify-center h-full">
               <p className="text-gray-600">Unable to load chat interface</p>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Configuration Info */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Configuration</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="font-medium text-gray-900 mb-2">Connected Systems</h4>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
-                Customer Database
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
-                CRM System
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-yellow-400 rounded-full mr-2"></span>
-                Knowledge Base
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-medium text-gray-900 mb-2">Model Settings</h4>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li>Primary Model: GPT-4</li>
-              <li>Fallback Model: GPT-3.5-turbo</li>
-              <li>Max Tokens: 4,096</li>
-              <li>Temperature: 0.7</li>
-            </ul>
-          </div>
         </div>
       </div>
     </div>
