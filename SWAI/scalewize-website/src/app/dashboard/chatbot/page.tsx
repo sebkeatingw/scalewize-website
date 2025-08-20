@@ -1,106 +1,134 @@
-'use client';
+'use client'
 
-import React, { useEffect, useState } from 'react';
-import ChatbotWithOAuth from '../../../components/ChatbotWithOAuth';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useState, useEffect, useRef } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { MessageSquare, Loader2 } from 'lucide-react'
+import { supabase } from '@/lib/supabase-client';
 
-const ChatbotPage: React.FC = () => {
-  const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
+export default function ChatbotPage() {
+  const { user, organization, profile } = useAuth()
+  const [libreChatUrl, setLibreChatUrl] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>('')
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [isVisible, setIsVisible] = useState(true)
 
   useEffect(() => {
-    // Ensure user is authenticated
-    if (user) {
-      setIsLoading(false);
+    const getLibreChatSession = async () => {
+      if (!user || !organization) {
+        setLoading(false)
+        return
+      }
+      try {
+        setLoading(true)
+        // Get Supabase session and access token
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        // Call your backend SSO endpoint
+        const libreChatBaseUrl = process.env.NEXT_PUBLIC_LIBRECHAT_URL || 'https://localhost:3080'
+        const res = await fetch(`${libreChatBaseUrl}/api/auth/sso/librechat`, {
+          method: 'POST',
+          credentials: 'include', // send cookies (if any)
+          headers: accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {},
+        })
+        if (!res.ok) throw new Error('Failed to get LibreChat session')
+        const { libreSession } = await res.json()
+        // Build the LibreChat URL (use HTTPS)
+        setLibreChatUrl(libreChatBaseUrl.replace('http://', 'https://'))
+      } catch (err) {
+        setError('Failed to connect to chat service')
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [user]);
+    getLibreChatSession()
+  }, [user, organization])
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading chatbot...</p>
-        </div>
-      </div>
-    );
+  // Handle iframe load event
+  const handleIframeLoad = () => {
+    setIframeLoaded(true)
   }
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Authentication Required</h2>
-          <p className="text-gray-600">Please log in to access the chatbot.</p>
-        </div>
-      </div>
-    );
-  }
+  // Keep iframe loaded even when tab is not visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsVisible(document.visibilityState === 'visible')
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  // Debug prints
+  console.log('user:', user);
+  console.log('organization:', organization);
+  console.log('libreChatUrl:', libreChatUrl);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+    <div className="space-y-6">
+      {/* Chat Interface */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">AI Chatbot</h1>
+              <h3 className="text-lg font-medium text-gray-900">
+                {organization?.name || 'AI'} Chatbot
+              </h3>
               <p className="text-sm text-gray-600">
-                Powered by Google Drive integration
+                Powered by ScaleWize AI - Connected to your business systems and databases
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Welcome, {user.email}</p>
-              <p className="text-xs text-gray-500">User ID: {user.id}</p>
+            <div className="flex items-center space-x-2">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Connected
+              </span>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Chatbot Container */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <ChatbotWithOAuth
-            chatbotUrl="https://scalewize-production-chatbot-production.up.railway.app"
-            userId={user.id}
-            style={{
-              height: '80vh',
-              minHeight: '600px'
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Information Panel */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-blue-900 mb-3">
-            🔐 Google Drive Integration
-          </h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-medium text-blue-800 mb-2">Available Tools:</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• <strong>search_file</strong> - Search for files in Google Drive</li>
-                <li>• <strong>list_files</strong> - List files and folders</li>
-                <li>• <strong>get_file_metadata</strong> - Get detailed file information</li>
-                <li>• <strong>read_content</strong> - Read file content</li>
-              </ul>
+        <div className="h-[600px]">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+                <p className="text-gray-600">Connecting to chat service...</p>
+              </div>
             </div>
-            <div>
-              <h4 className="font-medium text-blue-800 mb-2">How to Use:</h4>
-              <ol className="text-sm text-blue-700 space-y-1">
-                <li>1. Start a conversation with the AI</li>
-                <li>2. Ask to search or access your Google Drive files</li>
-                <li>3. Complete OAuth authentication when prompted</li>
-                <li>4. Use Google Drive tools seamlessly</li>
-              </ol>
+          ) : error ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <p className="text-red-600 mb-4">{error}</p>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Retry Connection
+                </button>
+              </div>
             </div>
-          </div>
+          ) : libreChatUrl ? (
+            <iframe
+              ref={iframeRef}
+              src={`${libreChatUrl}`}
+              className="w-full h-full rounded-b-lg"
+              title="ScaleWize AI Chatbot"
+              frameBorder="0"
+              onLoad={handleIframeLoad}
+              style={{ 
+                display: iframeLoaded ? 'block' : 'none',
+                opacity: isVisible ? 1 : 0.99, // Keep iframe active but slightly transparent when not visible
+                transition: 'opacity 0.2s ease-in-out'
+              }}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-600">Unable to load chat interface</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
-  );
-};
-
-export default ChatbotPage; 
+  )
+} 
