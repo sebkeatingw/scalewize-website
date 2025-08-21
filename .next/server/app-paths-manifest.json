@@ -1,0 +1,8 @@
+{
+  "/api/invite-admin/route": "app/api/invite-admin/route.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/settings/page": "app/dashboard/settings/page.js",
+  "/invite/[token]/page": "app/invite/[token]/page.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js"
+}

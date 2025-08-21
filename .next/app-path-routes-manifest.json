@@ -1,0 +1,20 @@
+{
+  "/api/auth/invite/route": "/api/auth/invite",
+  "/_not-found/page": "/_not-found",
+  "/api/librechat/auth/route": "/api/librechat/auth",
+  "/favicon.ico/route": "/favicon.ico",
+  "/auth/callback/page": "/auth/callback",
+  "/auth/reset-password/page": "/auth/reset-password",
+  "/page": "/",
+  "/auth/forgot-password/page": "/auth/forgot-password",
+  "/debug/page": "/debug",
+  "/test/page": "/test",
+  "/signup/page": "/signup",
+  "/dashboard/analytics/page": "/dashboard/analytics",
+  "/dashboard/chatbot/page": "/dashboard/chatbot",
+  "/dashboard/explore/page": "/dashboard/explore",
+  "/dashboard/settings/page": "/dashboard/settings",
+  "/dashboard/linkedin/page": "/dashboard/linkedin",
+  "/dashboard/invite/page": "/dashboard/invite",
+  "/login/page": "/login"
+}
