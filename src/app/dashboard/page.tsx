@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
-import { MessageSquare, Users, Zap, Clock, TrendingUp, ArrowRight, BarChart3, Settings, Building2 } from 'lucide-react'
+import { MessageSquare, Users, Zap, Clock, TrendingUp, ArrowRight, BarChart3, Settings, Building2, Shield } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 export default function DashboardPage() {
@@ -108,7 +108,7 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#f0ede8' }}>
@@ -120,11 +120,11 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#f0ede8' }}>
-                <Settings className="h-5 w-5" style={{ color: '#595F39' }} />
+                <Shield className="h-5 w-5" style={{ color: '#595F39' }} />
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-600">Plan</p>
@@ -132,7 +132,7 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-          
+
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#f0ede8' }}>
@@ -143,6 +143,26 @@ export default function DashboardPage() {
                 <p className="text-lg font-semibold text-gray-900 capitalize">{profile?.role}</p>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* User Status */}
+        <div className="mt-4">
+          <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${
+            profile?.status === 'active' ? 'bg-green-100 text-green-700 border-green-200' :
+            profile?.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+            profile?.status === 'invited' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+            profile?.status === 'suspended' ? 'bg-red-100 text-red-700 border-red-200' :
+            'bg-gray-100 text-gray-700 border-gray-200'
+          }">
+            <span className="w-2 h-2 rounded-full mr-2 ${
+              profile?.status === 'active' ? 'bg-green-500' :
+              profile?.status === 'pending' ? 'bg-yellow-500' :
+              profile?.status === 'invited' ? 'bg-blue-500' :
+              profile?.status === 'suspended' ? 'bg-red-500' :
+              'bg-gray-500'
+            }"></span>
+            Status: {profile?.status || 'Unknown'}
           </div>
         </div>
       </div>

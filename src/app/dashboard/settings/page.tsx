@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase-client'
-import { UserPlus, Mail, Users, Trash2, Copy, CheckCircle, Building2, Settings, Shield, TrendingUp, Clock, DollarSign } from 'lucide-react'
+import { UserPlus, Mail, Users, Trash2, Copy, CheckCircle, Building2, Settings, Shield, TrendingUp, Clock, DollarSign, User } from 'lucide-react'
 import Image from 'next/image'
-import type { OrganizationInvitation } from '@/types/database'
+import type { OrganizationInvitation, OrganizationMember } from '@/types/database'
 
 export default function SettingsPage() {
   const { profile, organization } = useAuth()
   const [invitations, setInvitations] = useState<OrganizationInvitation[]>([])
+  const [members, setMembers] = useState<OrganizationMember[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [email, setEmail] = useState('')
@@ -20,6 +21,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (profile?.role === 'admin' || profile?.role === 'super_admin') {
       loadInvitations()
+      loadMembers()
     }
   }, [profile?.role])
 
@@ -37,6 +39,24 @@ export default function SettingsPage() {
       console.error('Error loading invitations:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('organization_members')
+        .select(`
+          *,
+          profile:profiles(id, email, full_name, status, role, created_at)
+        `)
+        .eq('organization_id', organization?.id)
+        .order('joined_at', { ascending: false })
+
+      if (error) throw error
+      setMembers(data || [])
+    } catch (error) {
+      console.error('Error loading members:', error)
     }
   }
 
@@ -108,6 +128,16 @@ export default function SettingsPage() {
       case 'accepted': return 'text-green-600 bg-green-100 border-green-200'
       case 'expired': return 'text-red-600 bg-red-100 border-red-200'
       case 'cancelled': return 'text-gray-600 bg-gray-100 border-gray-200'
+      default: return 'text-gray-600 bg-gray-100 border-gray-200'
+    }
+  }
+
+  const getProfileStatusColor = (status: string) => {
+    switch (status) {
+      case 'invited': return 'text-blue-600 bg-blue-100 border-blue-200'
+      case 'pending': return 'text-yellow-600 bg-yellow-100 border-yellow-200'
+      case 'active': return 'text-green-600 bg-green-100 border-green-200'
+      case 'suspended': return 'text-red-600 bg-red-100 border-red-200'
       default: return 'text-gray-600 bg-gray-100 border-gray-200'
     }
   }
@@ -367,6 +397,76 @@ export default function SettingsPage() {
                           </button>
                         </>
                       )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Organization Members */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <User className="h-6 w-6 text-blue-600" />
+              <h2 className="text-xl font-semibold text-gray-900">Organization Members</h2>
+            </div>
+            <span className="bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-sm font-medium">
+              {members.length} members
+            </span>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-gray-600 mt-4">Loading members...</p>
+            </div>
+          ) : members.length === 0 ? (
+            <div className="text-center py-12">
+              <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No members yet</h3>
+              <p className="text-gray-600">Invite team members to get started.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {members.map((member) => (
+                <div key={member.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <span className="text-sm font-medium text-blue-600">
+                            {member.profile?.full_name?.charAt(0) || member.profile?.email?.charAt(0) || 'U'}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {member.profile?.full_name || member.profile?.email}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Joined on {new Date(member.joined_at || '').toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex space-x-2">
+                          <span className={`px-3 py-1 text-xs font-medium rounded-full border ${
+                            member.role === 'admin' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                            member.role === 'super_admin' ? 'bg-red-100 text-red-700 border-red-200' :
+                            'bg-gray-100 text-gray-700 border-gray-200'
+                          }`}>
+                            {member.role}
+                          </span>
+                          <span className={`px-3 py-1 text-xs font-medium rounded-full border ${
+                            getProfileStatusColor(member.profile?.status || 'pending')
+                          }`}>
+                            {member.profile?.status || 'pending'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

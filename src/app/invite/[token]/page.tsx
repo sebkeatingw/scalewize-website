@@ -114,7 +114,8 @@ export default function InvitePage({ params }: { params: { token: string } }) {
         .from('profiles')
         .update({
           organization_id: invitation!.organization_id,
-          role: 'user' // Default role for invited users
+          role: 'user', // Default role for invited users
+          status: 'active' // Set status to active when they accept invitation
         })
         .eq('id', userId)
 
