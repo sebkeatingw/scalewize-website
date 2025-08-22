@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase-client'
-import { Loader2, CheckCircle, XCircle, Mail, Building2, User } from 'lucide-react'
+import { Loader2, CheckCircle, XCircle, Mail, Building2, User, ArrowRight, Shield } from 'lucide-react'
+import Image from 'next/image'
+import Link from 'next/link'
 
 interface InvitationData {
   id: string
@@ -150,10 +152,16 @@ export default function InvitePage({ params }: { params: { token: string } }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f8f7f4 0%, #f0ede8 100%)' }}>
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900">Validating invitation...</h2>
+          <div className="mb-6">
+            <Image src="/scalewize_logo.png" alt="ScaleWize AI Logo" width={200} height={50} className="mx-auto" />
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Validating invitation...</h2>
+            <p className="text-gray-600">Please wait while we verify your invitation link.</p>
+          </div>
         </div>
       </div>
     )
@@ -161,18 +169,24 @@ export default function InvitePage({ params }: { params: { token: string } }) {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
-          <div className="text-center">
-            <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f8f7f4 0%, #f0ede8 100%)' }}>
+        <div className="text-center">
+          <div className="mb-6">
+            <Image src="/scalewize_logo.png" alt="ScaleWize AI Logo" width={200} height={50} className="mx-auto" />
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
+            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <XCircle className="h-8 w-8 text-red-600" />
+            </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Invalid Invitation</h2>
             <p className="text-gray-600 mb-6">{error}</p>
-            <button
-              onClick={() => router.push('/login')}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+            <Link
+              href="/login"
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center font-medium"
             >
               Go to Login
-            </button>
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
           </div>
         </div>
       </div>
@@ -181,10 +195,15 @@ export default function InvitePage({ params }: { params: { token: string } }) {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
-          <div className="text-center">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f8f7f4 0%, #f0ede8 100%)' }}>
+        <div className="text-center">
+          <div className="mb-6">
+            <Image src="/scalewize_logo.png" alt="ScaleWize AI Logo" width={200} height={50} className="mx-auto" />
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Welcome to {invitation?.organization.name}!</h2>
             <p className="text-gray-600 mb-6">You've successfully joined the organization. Redirecting to dashboard...</p>
             <Loader2 className="h-6 w-6 animate-spin text-blue-600 mx-auto" />
@@ -195,67 +214,97 @@ export default function InvitePage({ params }: { params: { token: string } }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6">
-        <div className="text-center mb-6">
-          <Building2 className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900">You're Invited!</h2>
-          <p className="text-gray-600 mt-2">Join {invitation?.organization.name} on ScaleWize AI</p>
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(135deg, #f8f7f4 0%, #f0ede8 100%)' }}>
+      <div className="text-center w-full max-w-md">
+        {/* Logo */}
+        <div className="mb-8">
+          <Image src="/scalewize_logo.png" alt="ScaleWize AI Logo" width={200} height={50} className="mx-auto" />
         </div>
 
-        <div className="space-y-4 mb-6">
-          <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-            <Mail className="h-5 w-5 text-gray-400" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">{invitation?.email}</p>
-              <p className="text-xs text-gray-500">Invited email address</p>
+        {/* Invitation Card */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+          {/* Header */}
+          <div className="mb-6">
+            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
+              <Building2 className="h-8 w-8 text-blue-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">You're Invited!</h2>
+            <p className="text-gray-600">Join {invitation?.organization.name} on ScaleWize AI</p>
+          </div>
+
+          {/* Invitation Details */}
+          <div className="space-y-4 mb-6">
+            <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                <Mail className="h-5 w-5 text-blue-600" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-gray-900">{invitation?.email}</p>
+                <p className="text-xs text-gray-500">Invited email address</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                <User className="h-5 w-5 text-green-600" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-gray-900">{invitation?.invited_by.full_name}</p>
+                <p className="text-xs text-gray-500">Invited by</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-purple-600" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-gray-900">{invitation?.organization.name}</p>
+                <p className="text-xs text-gray-500">Organization</p>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-            <User className="h-5 w-5 text-gray-400" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">{invitation?.invited_by.full_name}</p>
-              <p className="text-xs text-gray-500">Invited by</p>
-            </div>
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            <button
+              onClick={handleAcceptInvitation}
+              disabled={processing}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center font-medium"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Shield className="h-4 w-4 mr-2" />
+                  Accept Invitation
+                </>
+              )}
+            </button>
+
+            <Link
+              href="/login"
+              className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center font-medium"
+            >
+              I already have an account
+            </Link>
           </div>
 
-          <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-            <Building2 className="h-5 w-5 text-gray-400" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">{invitation?.organization.name}</p>
-              <p className="text-xs text-gray-500">Organization</p>
-            </div>
+          {/* Expiration Notice */}
+          <div className="mt-6 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-xs text-yellow-800">
+              <strong>Note:</strong> This invitation expires on {new Date(invitation?.expires_at || '').toLocaleDateString()}
+            </p>
           </div>
         </div>
 
-        <div className="space-y-3">
-          <button
-            onClick={handleAcceptInvitation}
-            disabled={processing}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-          >
-            {processing ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Processing...
-              </>
-            ) : (
-              'Accept Invitation'
-            )}
-          </button>
-
-          <button
-            onClick={() => router.push('/login')}
-            className="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors"
-          >
-            I already have an account
-          </button>
-        </div>
-
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
-            This invitation expires on {new Date(invitation?.expires_at || '').toLocaleDateString()}
+        {/* Footer */}
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-500">
+            Powered by ScaleWize AI - Simplifying AI for businesses
           </p>
         </div>
       </div>
