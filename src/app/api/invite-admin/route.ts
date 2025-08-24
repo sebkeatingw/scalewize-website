@@ -6,6 +6,8 @@ export async function POST(request: NextRequest) {
   try {
     const { email, organizationId, userId } = await request.json()
     
+    console.log('Creating invitation for:', { email, organizationId, userId })
+    
     // Validate input
     if (!email || !organizationId || !userId) {
       return NextResponse.json(
@@ -45,11 +47,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (profileError || !profile) {
+      console.error('Admin check failed:', profileError)
       return NextResponse.json(
         { error: 'You must be an admin to invite users' },
         { status: 403 }
       )
     }
+
+    console.log('Admin verification successful:', profile.role)
 
     // Check if user is already a member
     const { data: existingMember } = await supabaseAdmin
@@ -68,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     // Check if invitation already exists and is pending
     const { data: existingInvitation } = await supabaseAdmin
-      .from('organization_invitations')
+      .from('invitations')
       .select('id')
       .eq('email', email)
       .eq('organization_id', organizationId)
@@ -86,9 +91,9 @@ export async function POST(request: NextRequest) {
     const token = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
-    // Create invitation record using service role
+    // Create invitation record in the new invitations table using service role
     const { data: invitation, error: invitationError } = await supabaseAdmin
-      .from('organization_invitations')
+      .from('invitations')
       .insert({
         organization_id: organizationId,
         email,
@@ -103,10 +108,12 @@ export async function POST(request: NextRequest) {
     if (invitationError) {
       console.error('Invitation creation error:', invitationError)
       return NextResponse.json(
-        { error: 'Failed to create invitation' },
+        { error: 'Failed to create invitation: ' + invitationError.message },
         { status: 500 }
       )
     }
+
+    console.log('Invitation created successfully:', invitation.id)
 
     // Get organization details for email
     const { data: organization } = await supabaseAdmin
@@ -115,9 +122,10 @@ export async function POST(request: NextRequest) {
       .eq('id', organizationId)
       .single()
 
-    // Send invitation email (you'll need to implement this)
-    // For now, we'll just return the invitation data
-    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${token}`
+    // Create invitation URL
+    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/invite/${token}`
+
+    console.log('Invitation URL created:', inviteUrl)
 
     // TODO: Implement email sending
     // await sendInvitationEmail(email, inviteUrl, organization?.name, profile.full_name)
@@ -136,7 +144,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Admin invitation API error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error: ' + (error as Error).message },
       { status: 500 }
     )
   }

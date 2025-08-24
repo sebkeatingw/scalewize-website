@@ -23,6 +23,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log('Starting signup process for:', email)
+
     // Create user with auto-confirmed email
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -34,12 +36,13 @@ export async function POST(request: NextRequest) {
     if (userError || !userData.user) {
       console.error('User creation error:', userError)
       return NextResponse.json(
-        { error: 'Failed to create user' },
+        { error: userError?.message || 'Failed to create user' },
         { status: 500 }
       )
     }
 
     const userId = userData.user.id
+    console.log('User created successfully:', userId)
 
     // Create organization
     const { data: orgData, error: orgError } = await supabaseAdmin
@@ -65,6 +68,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log('Organization created successfully:', orgData.id)
+
     // Create profile with 'active' status for the new user
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
@@ -75,7 +80,9 @@ export async function POST(request: NextRequest) {
         full_name: fullName,
         role: 'admin', // First user becomes admin
         status: 'active', // Set status to active for new signups
-        is_active: true
+        is_active: true,
+        onboarding_step: 'completed',
+        profile_completion_percentage: 100
       })
 
     if (profileError) {
@@ -84,26 +91,29 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin.auth.admin.deleteUser(userId)
       await supabaseAdmin.from('organizations').delete().eq('id', orgData.id)
       return NextResponse.json(
-        { error: 'Failed to create profile' },
+        { error: 'Failed to create profile: ' + profileError.message },
         { status: 500 }
       )
     }
 
-    // Create organization member record
-    const { error: memberError } = await supabaseAdmin
-      .from('organization_members')
-      .insert({
-        organization_id: orgData.id,
-        user_id: userId,
-        role: 'admin',
-        joined_at: new Date().toISOString()
-      })
+    console.log('Profile created successfully')
 
-    if (memberError) {
-      console.error('Organization member creation error:', memberError)
-      // Profile and org are already created, so just log the error
-      console.warn('Failed to create organization member record, but user and org were created')
+    // Verify the profile was created by reading it back
+    const { data: verifyProfile, error: verifyError } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (verifyError || !verifyProfile) {
+      console.error('Profile verification failed:', verifyError)
+      return NextResponse.json(
+        { error: 'Profile created but verification failed' },
+        { status: 500 }
+      )
     }
+
+    console.log('Profile verification successful:', verifyProfile)
 
     return NextResponse.json({
       success: true,
@@ -111,14 +121,15 @@ export async function POST(request: NextRequest) {
       data: {
         userId,
         organizationId: orgData.id,
-        organizationName: orgData.name
+        organizationName: orgData.name,
+        profile: verifyProfile
       }
     })
 
   } catch (error) {
     console.error('Signup error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error: ' + (error as Error).message },
       { status: 500 }
     )
   }

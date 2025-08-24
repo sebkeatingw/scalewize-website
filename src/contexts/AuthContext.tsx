@@ -26,13 +26,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function loadSession() {
       setLoading(true)
-      const { data: { session } } = await supabase.auth.getSession()
-      if (unsubscribed) return
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        await fetchProfile(session.user.id)
+      try {
+        console.log('Loading session...')
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError)
+        }
+        
+        if (unsubscribed) return
+        
+        console.log('Session loaded:', session?.user?.id || 'No user')
+        setUser(session?.user ?? null)
+        
+        if (session?.user) {
+          await fetchProfile(session.user.id)
+        }
+      } catch (error) {
+        console.error('Error loading session:', error)
+      } finally {
+        if (!unsubscribed) {
+          setLoading(false)
+        }
       }
-      setLoading(false)
     }
 
     loadSession()
@@ -40,10 +56,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         if (unsubscribed) return
+        
+        console.log('Auth state changed:', _event, session?.user?.id || 'No user')
         setUser(session?.user ?? null)
+        
         if (session?.user) {
           await fetchProfile(session.user.id)
         } else {
+          console.log('No session, clearing profile and organization')
           setProfile(null)
           setOrganization(null)
           if (window.location.pathname !== '/login') router.push('/login')
@@ -59,41 +79,77 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router])
 
   const fetchProfile = async (userId: string) => {
-    const { data: profileData, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-
-    if (profileError) {
-      setProfile(null)
-      setOrganization(null)
-      return
-    }
-
-    setProfile(profileData)
-
-    if (profileData?.organization_id) {
-      const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
+    try {
+      console.log('Fetching profile for user:', userId)
+      
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
         .select('*')
-        .eq('id', profileData.organization_id)
+        .eq('id', userId)
         .single()
-      if (orgError) {
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError)
+        console.error('Error details:', {
+          message: profileError.message,
+          details: profileError.details,
+          hint: profileError.hint,
+          code: profileError.code
+        })
+        setProfile(null)
         setOrganization(null)
-      } else {
-        setOrganization(orgData)
+        return
       }
-    } else {
+
+      console.log('Profile fetched successfully:', profileData)
+      setProfile(profileData)
+
+      if (profileData?.organization_id) {
+        console.log('Fetching organization:', profileData.organization_id)
+        
+        const { data: orgData, error: orgError } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', profileData.organization_id)
+          .single()
+        
+        if (orgError) {
+          console.error('Organization fetch error:', orgError)
+          console.error('Organization error details:', {
+            message: orgError.message,
+            details: orgError.details,
+            hint: orgError.hint,
+            code: orgError.code
+          })
+          setOrganization(null)
+        } else {
+          console.log('Organization fetched successfully:', orgData)
+          setOrganization(orgData)
+        }
+      } else {
+        console.log('No organization_id in profile')
+        setOrganization(null)
+      }
+    } catch (error) {
+      console.error('Unexpected error in fetchProfile:', error)
+      console.error('Error stack:', (error as Error).stack)
+      setProfile(null)
       setOrganization(null)
     }
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
-    localStorage.clear()
-    sessionStorage.clear()
-    window.location.href = '/login'
+    try {
+      console.log('Signing out...')
+      await supabase.auth.signOut()
+      localStorage.clear()
+      sessionStorage.clear()
+      window.location.href = '/login'
+    } catch (error) {
+      console.error('Error during sign out:', error)
+      // Force redirect even if there's an error
+      window.location.href = '/login'
+    }
   }
 
   return (

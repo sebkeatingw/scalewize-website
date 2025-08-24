@@ -5,12 +5,23 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase-client'
 import { UserPlus, Mail, Users, Trash2, Copy, CheckCircle, Building2, Settings, Shield, TrendingUp, Clock, DollarSign, User } from 'lucide-react'
 import Image from 'next/image'
-import type { OrganizationInvitation, OrganizationMember } from '@/types/database'
+
+// Define the invitation type based on our new table structure
+interface Invitation {
+  id: string
+  organization_id: string
+  email: string
+  token: string
+  invited_by: string
+  expires_at: string
+  status: 'pending' | 'accepted' | 'expired'
+  created_at: string
+}
 
 export default function SettingsPage() {
   const { profile, organization } = useAuth()
-  const [invitations, setInvitations] = useState<OrganizationInvitation[]>([])
-  const [members, setMembers] = useState<OrganizationMember[]>([])
+  const [invitations, setInvitations] = useState<Invitation[]>([])
+  const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [email, setEmail] = useState('')
@@ -28,7 +39,7 @@ export default function SettingsPage() {
   const loadInvitations = async () => {
     try {
       const { data, error } = await supabase
-        .from('organization_invitations')
+        .from('invitations')  // Changed from 'organization_invitations' to 'invitations'
         .select('*')
         .eq('organization_id', organization?.id)
         .order('created_at', { ascending: false })
@@ -44,14 +55,12 @@ export default function SettingsPage() {
 
   const loadMembers = async () => {
     try {
+      // Simplified: just load profiles from the same organization
       const { data, error } = await supabase
-        .from('organization_members')
-        .select(`
-          *,
-          profile:profiles(id, email, full_name, status, role, created_at)
-        `)
+        .from('profiles')
+        .select('id, email, full_name, status, role, created_at')
         .eq('organization_id', organization?.id)
-        .order('joined_at', { ascending: false })
+        .order('created_at', { ascending: false })
 
       if (error) throw error
       setMembers(data || [])
@@ -111,8 +120,8 @@ export default function SettingsPage() {
   const cancelInvitation = async (invitationId: string) => {
     try {
       const { error } = await supabase
-        .from('organization_invitations')
-        .update({ status: 'cancelled' })
+        .from('invitations')  // Changed from 'organization_invitations' to 'invitations'
+        .update({ status: 'expired' })  // Changed from 'cancelled' to 'expired' to match our enum
         .eq('id', invitationId)
 
       if (error) throw error
@@ -127,7 +136,6 @@ export default function SettingsPage() {
       case 'pending': return 'text-yellow-600 bg-yellow-100 border-yellow-200'
       case 'accepted': return 'text-green-600 bg-green-100 border-green-200'
       case 'expired': return 'text-red-600 bg-red-100 border-red-200'
-      case 'cancelled': return 'text-gray-600 bg-gray-100 border-gray-200'
       default: return 'text-gray-600 bg-gray-100 border-gray-200'
     }
   }
@@ -441,15 +449,15 @@ export default function SettingsPage() {
                       <div className="flex items-center space-x-3 mb-2">
                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                           <span className="text-sm font-medium text-blue-600">
-                            {member.profile?.full_name?.charAt(0) || member.profile?.email?.charAt(0) || 'U'}
+                            {member.full_name?.charAt(0) || member.email?.charAt(0) || 'U'}
                           </span>
                         </div>
                         <div>
                           <p className="font-medium text-gray-900">
-                            {member.profile?.full_name || member.profile?.email}
+                            {member.full_name || member.email}
                           </p>
                           <p className="text-sm text-gray-500">
-                            Joined on {new Date(member.joined_at || '').toLocaleDateString()}
+                            Joined on {new Date(member.created_at || '').toLocaleDateString()}
                           </p>
                         </div>
                         <div className="flex space-x-2">
@@ -461,9 +469,9 @@ export default function SettingsPage() {
                             {member.role}
                           </span>
                           <span className={`px-3 py-1 text-xs font-medium rounded-full border ${
-                            getProfileStatusColor(member.profile?.status || 'pending')
+                            getProfileStatusColor(member.status || 'pending')
                           }`}>
-                            {member.profile?.status || 'pending'}
+                            {member.status || 'pending'}
                           </span>
                         </div>
                       </div>

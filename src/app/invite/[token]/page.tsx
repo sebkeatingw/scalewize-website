@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase-client'
-import { Loader2, CheckCircle, XCircle, Mail, Building2, User, ArrowRight, Shield } from 'lucide-react'
+import { Loader2, CheckCircle, XCircle, Mail, Building2, User, ArrowRight, Shield, Lock } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -27,6 +27,11 @@ export default function InvitePage({ params }: { params: { token: string } }) {
   const [invitation, setInvitation] = useState<InvitationData | null>(null)
   const [processing, setProcessing] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [showSignupForm, setShowSignupForm] = useState(false)
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [signupError, setSignupError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -35,36 +40,56 @@ export default function InvitePage({ params }: { params: { token: string } }) {
 
   const validateToken = async () => {
     try {
-      // Get invitation data
+      console.log('Validating token:', params.token)
+      
+      // Simplified query - just get the basic invitation data first
       const { data: invitationData, error: invitationError } = await supabase
-        .from('organization_invitations')
-        .select(`
-          id,
-          organization_id,
-          email,
-          expires_at,
-          status,
-          organization:organizations(name),
-          invited_by:profiles!organization_invitations_invited_by_fkey(full_name)
-        `)
+        .from('invitations')
+        .select('id, organization_id, email, expires_at, status, token, invited_by')
         .eq('token', params.token)
         .eq('status', 'pending')
         .single()
 
+      console.log('Invitation query result:', { invitationData, invitationError })
+
       if (invitationError || !invitationData) {
+        console.error('Invitation not found:', invitationError)
         setError('Invalid or expired invitation link')
         setLoading(false)
         return
       }
 
+      // Now get organization and inviter details separately
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', invitationData.organization_id)
+        .single()
+
+      const { data: inviterData } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', invitationData.invited_by)
+        .single()
+
       // Check if invitation is expired
       if (new Date(invitationData.expires_at) < new Date()) {
+        console.log('Invitation expired:', invitationData.expires_at)
         setError('This invitation has expired')
         setLoading(false)
         return
       }
 
-      setInvitation(invitationData)
+      // Combine the data
+      const fullInvitationData = {
+        ...invitationData,
+        organization: orgData || { name: 'Unknown Organization' },
+        invited_by: inviterData || { full_name: 'Unknown User' }
+      }
+
+      console.log('Invitation validated successfully:', fullInvitationData)
+      setInvitation(fullInvitationData)
+      setFullName(invitationData.email.split('@')[0]) // Pre-fill name from email
       setLoading(false)
     } catch (error) {
       console.error('Token validation error:', error)
@@ -92,13 +117,9 @@ export default function InvitePage({ params }: { params: { token: string } }) {
         // Update user's profile to join the organization
         await joinOrganization(user.id)
       } else {
-        // User needs to sign up/sign in
-        // Store invitation data in session storage for after auth
-        sessionStorage.setItem('pendingInvitation', JSON.stringify(invitation))
-        
-        // Redirect to signup with email pre-filled
-        router.push(`/signup?email=${encodeURIComponent(invitation.email)}&invite=true`)
-        return
+        // Show signup form for new users
+        setShowSignupForm(true)
+        setProcessing(false)
       }
     } catch (error) {
       console.error('Accept invitation error:', error)
@@ -107,17 +128,62 @@ export default function InvitePage({ params }: { params: { token: string } }) {
     }
   }
 
+  const handleSignupAndJoin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (password !== confirmPassword) {
+      setSignupError('Passwords do not match')
+      return
+    }
+
+    if (password.length < 6) {
+      setSignupError('Password must be at least 6 characters')
+      return
+    }
+
+    setProcessing(true)
+    setSignupError(null)
+
+    try {
+      // Create user account
+      const { data: { user }, error: signUpError } = await supabase.auth.signUp({
+        email: invitation!.email,
+        password: password,
+        options: {
+          data: {
+            full_name: fullName
+          }
+        }
+      })
+
+      if (signUpError || !user) {
+        throw signUpError || new Error('Failed to create user account')
+      }
+
+      // Create profile and join organization
+      await joinOrganization(user.id)
+    } catch (error) {
+      console.error('Signup error:', error)
+      setSignupError(error instanceof Error ? error.message : 'Failed to create account')
+      setProcessing(false)
+    }
+  }
+
   const joinOrganization = async (userId: string) => {
     try {
-      // Update user's profile to join the organization
+      // Create profile for the user
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
+        .insert({
+          id: userId,
+          email: invitation!.email,
+          full_name: fullName,
           organization_id: invitation!.organization_id,
           role: 'user', // Default role for invited users
-          status: 'active' // Set status to active when they accept invitation
+          status: 'active', // Set status to active when they accept invitation
+          onboarding_step: 'completed',
+          profile_completion_percentage: 100
         })
-        .eq('id', userId)
 
       if (profileError) {
         throw profileError
@@ -125,10 +191,9 @@ export default function InvitePage({ params }: { params: { token: string } }) {
 
       // Mark invitation as accepted
       const { error: invitationError } = await supabase
-        .from('organization_invitations')
+        .from('invitations')
         .update({
-          status: 'accepted',
-          updated_at: new Date().toISOString()
+          status: 'accepted'
         })
         .eq('id', invitation!.id)
 
@@ -208,6 +273,122 @@ export default function InvitePage({ params }: { params: { token: string } }) {
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Welcome to {invitation?.organization.name}!</h2>
             <p className="text-gray-600 mb-6">You've successfully joined the organization. Redirecting to dashboard...</p>
             <Loader2 className="h-6 w-6 animate-spin text-blue-600 mx-auto" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (showSignupForm) {
+    return (
+      <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(135deg, #f8f7f4 0%, #f0ede8 100%)' }}>
+        <div className="text-center w-full max-w-md">
+          {/* Logo */}
+          <div className="mb-8">
+            <Image src="/scalewize_logo.png" alt="ScaleWize AI Logo" width={200} height={50} className="mx-auto" />
+          </div>
+
+          {/* Signup Form */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+            <div className="mb-6">
+              <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
+                <Lock className="h-8 w-8 text-blue-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Create Your Account</h2>
+              <p className="text-gray-600">Join {invitation?.organization.name} on ScaleWize AI</p>
+            </div>
+
+            <form onSubmit={handleSignupAndJoin} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2 text-left">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={invitation?.email}
+                  disabled
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2 text-left">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2 text-left">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2 text-left">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              {signupError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {signupError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={processing}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center font-medium"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Creating Account...
+                  </>
+                ) : (
+                  <>
+                    <Shield className="h-4 w-4 mr-2" />
+                    Create Account & Join Organization
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <Link
+                href="/login"
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                Already have an account? Sign in
+              </Link>
+            </div>
           </div>
         </div>
       </div>
