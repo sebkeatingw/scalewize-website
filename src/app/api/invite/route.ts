@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     // Check if invitation already exists and is pending
     const { data: existingInvitation } = await supabase
-      .from('organization_invitations')
+      .from('invitations')
       .select('id')
       .eq('email', email)
       .eq('organization_id', organizationId)
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     // Create invitation record
     const { data: invitation, error: invitationError } = await supabase
-      .from('organization_invitations')
+      .from('invitations')
       .insert({
         organization_id: organizationId,
         email,
@@ -122,7 +122,13 @@ export async function POST(request: NextRequest) {
     const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${token}`
 
     // TODO: Implement email sending
-    // await sendInvitationEmail(email, inviteUrl, organization?.name, profile.full_name)
+    // await sendInvitationEmail({
+    //   to: email,
+    //   inviteUrl,
+    //   organizationName: organization?.name || 'Your Organization',
+    //   inviterName: profile?.full_name || 'Team Admin',
+    //   expiresAt: expiresAt.toLocaleDateString()
+    // })
 
     return NextResponse.json({
       success: true,

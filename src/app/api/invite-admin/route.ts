@@ -131,12 +131,13 @@ export async function POST(request: NextRequest) {
     try {
       const { sendInvitationEmail } = await import('@/lib/email-service')
       
-      const emailResult = await sendInvitationEmail(
-        email,
+      const emailResult = await sendInvitationEmail({
+        to: email,
         inviteUrl,
-        organization?.name || 'Your Organization',
-        profile.full_name || 'Team Admin'
-      )
+        organizationName: organization?.name || 'Your Organization',
+        inviterName: profile.full_name || 'Team Admin',
+        expiresAt: expiresAt.toLocaleDateString()
+      })
 
       if (!emailResult.success) {
         console.error('Failed to send invitation email:', emailResult.error)
