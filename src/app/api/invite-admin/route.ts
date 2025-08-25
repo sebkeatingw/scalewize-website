@@ -127,8 +127,29 @@ export async function POST(request: NextRequest) {
 
     console.log('Invitation URL created:', inviteUrl)
 
-    // TODO: Implement email sending
-    // await sendInvitationEmail(email, inviteUrl, organization?.name, profile.full_name)
+    // Send invitation email
+    try {
+      const { sendInvitationEmail } = await import('@/lib/email-service')
+      
+      const emailResult = await sendInvitationEmail({
+        to: email,
+        organizationName: organization?.name || 'Your Organization',
+        inviterName: profile.full_name || 'Team Admin',
+        inviteUrl,
+        expiresAt: invitation.expires_at
+      })
+
+      if (!emailResult.success) {
+        console.error('Failed to send invitation email:', emailResult.error)
+        // Don't fail the entire invitation creation, just log the email error
+        // The invitation is still created and can be resent later
+      } else {
+        console.log('Invitation email sent successfully:', emailResult.messageId)
+      }
+    } catch (emailError) {
+      console.error('Email service error:', emailError)
+      // Continue with invitation creation even if email fails
+    }
 
     return NextResponse.json({
       success: true,
