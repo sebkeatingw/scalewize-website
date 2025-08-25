@@ -55,6 +55,12 @@
       "namedRegex": "^/dashboard/chatbot(?:/)?$"
     },
     {
+      "page": "/dashboard/explore",
+      "regex": "^/dashboard/explore(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dashboard/explore(?:/)?$"
+    },
+    {
       "page": "/dashboard/linkedin",
       "regex": "^/dashboard/linkedin(?:/)?$",
       "routeKeys": {},
@@ -67,6 +73,18 @@
       "namedRegex": "^/dashboard/settings(?:/)?$"
     },
     {
+      "page": "/debug",
+      "regex": "^/debug(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/debug(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    },
+    {
       "page": "/login",
       "regex": "^/login(?:/)?$",
       "routeKeys": {},
@@ -77,6 +95,12 @@
       "regex": "^/signup(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/signup(?:/)?$"
+    },
+    {
+      "page": "/test",
+      "regex": "^/test(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/test(?:/)?$"
     }
   ],
   "dataRoutes": [],

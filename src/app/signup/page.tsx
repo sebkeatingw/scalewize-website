@@ -19,7 +19,6 @@ export default function SignupPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const router = useRouter()
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,7 +46,6 @@ export default function SignupPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    setSuccess('')
 
     // Validation
     if (formData.password !== formData.confirmPassword) {
@@ -63,38 +61,63 @@ export default function SignupPage() {
     }
 
     try {
-      // Use the direct signup API route to handle signup
-      const response = await fetch('/api/signup-direct', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          fullName: formData.fullName,
-          organizationName: formData.organizationName,
-          organizationSlug: formData.organizationSlug,
-        }),
+      // Create user account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
       })
 
-      const result = await response.json()
-
-      if (!response.ok) {
-        setError(result.error || 'Failed to create account')
+      if (authError) {
+        setError(authError.message)
         setLoading(false)
         return
       }
 
-      if (result.requiresEmailConfirmation) {
-        setSuccess('Please check your email to confirm your account before continuing.')
-        setLoading(false)
-      } else {
-        // User is immediately authenticated - redirect to dashboard
+      if (authData.user) {
+        // Create organization
+        const { data: orgData, error: orgError } = await supabase
+          .from('organizations')
+          .insert({
+            name: formData.organizationName,
+            domain: formData.organizationSlug,
+            subscription_status: 'trial',
+            plan_type: 'starter',
+            max_users: 50,
+            max_chat_sessions: 1000,
+            monthly_token_limit: 100000,
+            librechat_config: {},
+          })
+          .select()
+          .single()
+
+        if (orgError) {
+          setError('Failed to create organization: ' + orgError.message)
+          setLoading(false)
+          return
+        }
+
+        // Create user profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            email: formData.email,
+            full_name: formData.fullName,
+            organization_id: orgData.id,
+            role: 'admin', // First user is admin
+            is_active: true,
+          })
+
+        if (profileError) {
+          setError('Failed to create user profile: ' + profileError.message)
+          setLoading(false)
+          return
+        }
+
+        // Redirect to dashboard
         router.push('/dashboard')
       }
     } catch (error) {
-      console.error('Signup error:', error)
       setError('An unexpected error occurred')
       setLoading(false)
     }
@@ -241,7 +264,7 @@ export default function SignupPage() {
                   required
                   value={formData.confirmPassword}
                   onChange={handleInputChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 pr-10"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 pr-10"
                   placeholder="Confirm your password"
                 />
                 <button
@@ -262,12 +285,6 @@ export default function SignupPage() {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
               {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
-              {success}
             </div>
           )}
 
@@ -297,4 +314,4 @@ export default function SignupPage() {
       </div>
     </div>
   )
-}
+} 
