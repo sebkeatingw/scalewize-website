@@ -101,7 +101,8 @@ export default function AdminPage() {
         },
         body: JSON.stringify({
           email: inviteEmail.trim(),
-          organizationId: organization?.id
+          organizationId: organization?.id,
+          userId: user?.id
         }),
       })
 
