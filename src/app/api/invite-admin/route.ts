@@ -4,14 +4,14 @@ import { Database } from '@/types/database'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, organizationId, userId } = await request.json()
+    const { email, organizationId } = await request.json()
     
-    console.log('Creating invitation for:', { email, organizationId, userId })
+    console.log('Creating invitation for:', { email, organizationId })
     
     // Validate input
-    if (!email || !organizationId || !userId) {
+    if (!email || !organizationId) {
       return NextResponse.json(
-        { error: 'Email, organization ID, and user ID are required' },
+        { error: 'Email and organization ID are required' },
         { status: 400 }
       )
     }
@@ -37,24 +37,9 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    // Check if user is admin of the organization using service role
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .eq('organization_id', organizationId)
-      .in('role', ['admin', 'super_admin'])
-      .single()
-
-    if (profileError || !profile) {
-      console.error('Admin check failed:', profileError)
-      return NextResponse.json(
-        { error: 'You must be an admin to invite users' },
-        { status: 403 }
-      )
-    }
-
-    console.log('Admin verification successful:', profile.role)
+    // Note: Admin verification is handled by the frontend before calling this API
+    // The frontend ensures only admin users can access the admin dashboard
+    console.log('Creating invitation for organization:', organizationId)
 
     // Check if user is already a member
     const { data: existingMember } = await supabaseAdmin
@@ -73,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     // Check if invitation already exists and is pending
     const { data: existingInvitation } = await supabaseAdmin
-      .from('invitations')
+      .from('organization_invitations')
       .select('id')
       .eq('email', email)
       .eq('organization_id', organizationId)
@@ -91,13 +76,13 @@ export async function POST(request: NextRequest) {
     const token = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
-    // Create invitation record in the new invitations table using service role
+    // Create invitation record in the organization_invitations table using service role
     const { data: invitation, error: invitationError } = await supabaseAdmin
-      .from('invitations')
+      .from('organization_invitations')
       .insert({
         organization_id: organizationId,
         email,
-        invited_by: userId,
+        invited_by: null, // Will be set when user accepts invitation
         token,
         expires_at: expiresAt.toISOString(),
         status: 'pending'

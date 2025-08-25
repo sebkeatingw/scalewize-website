@@ -69,7 +69,7 @@ export default function AdminPage() {
 
       // Load pending invitations
       const { data: invitationsData, error: invitationsError } = await supabase
-        .from('invitations')
+        .from('organization_invitations')
         .select('*')
         .eq('organization_id', organization?.id)
         .eq('status', 'pending')
@@ -101,8 +101,7 @@ export default function AdminPage() {
         },
         body: JSON.stringify({
           email: inviteEmail.trim(),
-          organizationId: organization?.id,
-          userId: user?.id
+          organizationId: organization?.id
         }),
       })
 
@@ -125,7 +124,7 @@ export default function AdminPage() {
   const cancelInvitation = async (invitationId: string) => {
     try {
       const { error } = await supabase
-        .from('invitations')
+        .from('organization_invitations')
         .update({ status: 'cancelled' })
         .eq('id', invitationId)
 
