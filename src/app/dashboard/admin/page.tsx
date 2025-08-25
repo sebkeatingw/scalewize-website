@@ -44,7 +44,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
-  const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -120,50 +119,6 @@ export default function AdminPage() {
       setError(error instanceof Error ? error.message : 'Failed to send invitation')
     } finally {
       setInviting(false)
-    }
-  }
-
-  const resendInvitation = async (invitationId: string, email: string) => {
-    try {
-      setProcessing(true)
-      setError(null)
-
-      // Get invitation details
-      const { data: invitation, error: fetchError } = await supabase
-        .from('invitations')
-        .select('*')
-        .eq('id', invitationId)
-        .single()
-
-      if (fetchError || !invitation) {
-        throw new Error('Failed to fetch invitation details')
-      }
-
-      // Resend invitation email
-      const response = await fetch('/api/invite-admin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email,
-          organizationId: organization?.id,
-          userId: user?.id
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to resend invitation')
-      }
-
-      setSuccess('Invitation resent successfully!')
-      loadOrganizationData() // Refresh the data
-    } catch (error) {
-      console.error('Error resending invitation:', error)
-      setError(error instanceof Error ? error.message : 'Failed to resend invitation')
-    } finally {
-      setProcessing(false)
     }
   }
 
@@ -452,20 +407,12 @@ export default function AdminPage() {
                       {new Date(invitation.expires_at).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => resendInvitation(invitation.id, invitation.email)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          Resend
-                        </button>
-                        <button
-                          onClick={() => cancelInvitation(invitation.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => cancelInvitation(invitation.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Cancel
+                      </button>
                     </td>
                   </tr>
                 ))}
