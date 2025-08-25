@@ -1,20 +1,24 @@
-import { supabase } from './supabase-client'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts"
 
 // Email configuration
-export const EMAIL_CONFIG = {
-  // n8n webhook configuration (recommended)
-  n8n: {
-    webhookUrl: process.env.N8N_WEBHOOK_URL || '',
-    enabled: true
+const EMAIL_CONFIG = {
+  from: {
+    email: "admin@scalewize.ai",
+    name: "ScaleWize AI"
   },
-  // Fallback to Supabase Auth emails
-  supabase: {
-    enabled: true
+  replyTo: "support@scalewize.ai",
+  smtp: {
+    hostname: Deno.env.get("SMTP_HOST") || "smtp.gmail.com",
+    port: parseInt(Deno.env.get("SMTP_PORT") || "587"),
+    username: Deno.env.get("SMTP_USER") || "",
+    password: Deno.env.get("SMTP_PASS") || "",
+    secure: Deno.env.get("SMTP_SECURE") === "true"
   }
 }
 
-// Email templates with ScaleWize branding
-export const EMAIL_TEMPLATES = {
+// Email templates
+const EMAIL_TEMPLATES = {
   invitation: {
     subject: 'You\'re invited to join {{organizationName}} on ScaleWize AI',
     html: `
@@ -142,7 +146,7 @@ export const EMAIL_TEMPLATES = {
           <div class="header">
             <div class="logo">ScaleWize AI</div>
             <div class="tagline">Simplifying AI for businesses</div>
-            </div>
+          </div>
           <div class="content">
             <h1 class="welcome-title">Welcome to ScaleWize AI!</h1>
             <p class="welcome-text">
@@ -203,235 +207,213 @@ export const EMAIL_TEMPLATES = {
   }
 }
 
-// Email service interface
-export interface IEmailService {
-  sendInvitationEmail(params: {
-    to: string
-    organizationName: string
-    inviterName: string
-    inviteUrl: string
-    expiresAt: string
-  }): Promise<{ success: boolean; messageId?: string; error?: string }>
+// Helper function to replace template variables
+function replaceTemplateVariables(template: string, variables: Record<string, string>): string {
+  let result = template
+  for (const [key, value] of Object.entries(variables)) {
+    result = result.replace(new RegExp(`{{${key}}}`, 'g'), value)
+  }
+  return result
+}
+
+// Helper function to send email via SMTP
+async function sendEmailViaSMTP(to: string, subject: string, html: string, text: string): Promise<string> {
+  const client = new SmtpClient()
   
-  sendWelcomeEmail(params: {
-    to: string
-    organizationName: string
-    dashboardUrl: string
-  }): Promise<{ success: boolean; messageId?: string; error?: string }>
-}
-
-// n8n webhook email service (recommended)
-class N8nEmailService implements IEmailService {
-  private webhookUrl: string
-
-  constructor() {
-    this.webhookUrl = EMAIL_CONFIG.n8n.webhookUrl
-  }
-
-  async sendInvitationEmail(params: {
-    to: string
-    organizationName: string
-    inviterName: string
-    inviteUrl: string
-    expiresAt: string
-  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    if (!this.webhookUrl) {
-      console.warn('n8n webhook URL not configured, falling back to Supabase Auth')
-      return { success: false, error: 'n8n webhook URL not configured' }
-    }
-
-    try {
-      const response = await fetch(this.webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'invitation',
-          to: params.to,
-          subject: EMAIL_TEMPLATES.invitation.subject.replace('{{organizationName}}', params.organizationName),
-          html: EMAIL_TEMPLATES.invitation.html
-            .replace(/{{organizationName}}/g, params.organizationName)
-            .replace(/{{inviterName}}/g, params.inviterName)
-            .replace(/{{inviteUrl}}/g, params.inviteUrl)
-            .replace(/{{expiresAt}}/g, params.expiresAt),
-          text: EMAIL_TEMPLATES.invitation.text
-            .replace(/{{organizationName}}/g, params.organizationName)
-            .replace(/{{inviterName}}/g, params.inviterName)
-            .replace(/{{inviteUrl}}/g, params.inviteUrl)
-            .replace(/{{expiresAt}}/g, params.expiresAt),
-          metadata: {
-            organizationName: params.organizationName,
-            inviterName: params.inviterName,
-            inviteUrl: params.inviteUrl,
-            expiresAt: params.expiresAt,
-            timestamp: new Date().toISOString()
-          }
-        })
+  try {
+    // Connect to SMTP server
+    if (EMAIL_CONFIG.smtp.secure) {
+      await client.connectTLS({
+        hostname: EMAIL_CONFIG.smtp.hostname,
+        port: EMAIL_CONFIG.smtp.port,
+        username: EMAIL_CONFIG.smtp.username,
+        password: EMAIL_CONFIG.smtp.password,
       })
-
-      if (!response.ok) {
-        const error = await response.text()
-        throw new Error(`n8n webhook error: ${error}`)
-      }
-
-      const result = await response.json()
-      return { success: true, messageId: result.id || `n8n-${Date.now()}` }
-    } catch (error) {
-      console.error('n8n webhook error:', error)
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
-    }
-  }
-
-  async sendWelcomeEmail(params: {
-    to: string
-    organizationName: string
-    dashboardUrl: string
-  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    if (!this.webhookUrl) {
-      console.warn('n8n webhook URL not configured, falling back to Supabase Auth')
-      return { success: false, error: 'n8n webhook URL not configured' }
-    }
-
-    try {
-      const response = await fetch(this.webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'welcome',
-          to: params.to,
-          subject: EMAIL_TEMPLATES.welcome.subject.replace('{{organizationName}}', params.organizationName),
-          html: EMAIL_TEMPLATES.welcome.html
-            .replace(/{{organizationName}}/g, params.organizationName)
-            .replace(/{{dashboardUrl}}/g, params.dashboardUrl),
-          text: EMAIL_TEMPLATES.welcome.text
-            .replace(/{{organizationName}}/g, params.organizationName)
-            .replace(/{{dashboardUrl}}/g, params.dashboardUrl),
-          metadata: {
-            organizationName: params.organizationName,
-            dashboardUrl: params.dashboardUrl,
-            timestamp: new Date().toISOString()
-          }
-        })
+    } else {
+      await client.connect({
+        hostname: EMAIL_CONFIG.smtp.hostname,
+        port: EMAIL_CONFIG.smtp.port,
+        username: EMAIL_CONFIG.smtp.username,
+        password: EMAIL_CONFIG.smtp.password,
       })
-
-      if (!response.ok) {
-        const error = await response.text()
-        throw new Error(`n8n webhook error: ${error}`)
-      }
-
-      const result = await response.json()
-      return { success: true, messageId: result.id || `n8n-${Date.now()}` }
-    } catch (error) {
-      console.error('n8n webhook error:', error)
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
+
+    // Send email
+    const messageId = await client.send({
+      from: `${EMAIL_CONFIG.from.name} <${EMAIL_CONFIG.from.email}>`,
+      to: to,
+      replyTo: EMAIL_CONFIG.replyTo,
+      subject: subject,
+      content: text,
+      html: html,
+    })
+
+    await client.close()
+    return messageId
+  } catch (error) {
+    await client.close()
+    throw error
   }
 }
 
-// Supabase Auth email service (fallback)
-class SupabaseEmailService implements IEmailService {
-  async sendInvitationEmail(params: {
-    to: string
-    organizationName: string
-    inviterName: string
-    inviteUrl: string
-    expiresAt: string
-  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    try {
-      // Use Supabase Auth to send invitation
-      const { data, error } = await supabase.auth.admin.inviteUserByEmail(params.to, {
-        data: {
-          organization_name: params.organizationName,
-          inviter_name: params.inviterName,
-          invite_url: params.inviteUrl,
-          expires_at: params.expiresAt
+// Main handler
+serve(async (req) => {
+  // Handle CORS
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    })
+  }
+
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Method not allowed' }),
+      { 
+        status: 405, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        } 
+      }
+    )
+  }
+
+  try {
+    const { type, to, subject, html, text, metadata } = await req.json()
+    
+    // Validate required fields
+    if (!to || !type) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing required fields: to, type' }),
+        { 
+          status: 400, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          } 
         }
-      })
-
-      if (error) throw error
-
-      return { success: true, messageId: data.user?.id }
-    } catch (error) {
-      console.error('Supabase invitation error:', error)
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      )
     }
-  }
 
-  async sendWelcomeEmail(params: {
-    to: string
-    organizationName: string
-    dashboardUrl: string
-  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    try {
-      // For welcome emails, we'll use a custom approach since Supabase doesn't have a built-in welcome email
-      console.log('Welcome email would be sent via Supabase Auth system')
-      return { success: true, messageId: 'supabase-auth-welcome' }
-    } catch (error) {
-      console.error('Supabase welcome email error:', error)
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    let finalSubject: string
+    let finalHtml: string
+    let finalText: string
+
+    // Process email based on type
+    switch (type) {
+      case 'invitation':
+        if (!metadata?.organizationName || !metadata?.inviterName || !metadata?.inviteUrl || !metadata?.expiresAt) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Missing invitation metadata' }),
+            { 
+              status: 400, 
+              headers: { 
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              } 
+            }
+          )
+        }
+        
+        finalSubject = replaceTemplateVariables(EMAIL_TEMPLATES.invitation.subject, {
+          organizationName: metadata.organizationName
+        })
+        finalHtml = replaceTemplateVariables(EMAIL_TEMPLATES.invitation.html, {
+          organizationName: metadata.organizationName,
+          inviterName: metadata.inviterName,
+          inviteUrl: metadata.inviteUrl,
+          expiresAt: metadata.expiresAt
+        })
+        finalText = replaceTemplateVariables(EMAIL_TEMPLATES.invitation.text, {
+          organizationName: metadata.organizationName,
+          inviterName: metadata.inviterName,
+          inviteUrl: metadata.inviteUrl,
+          expiresAt: metadata.expiresAt
+        })
+        break
+
+      case 'welcome':
+        if (!metadata?.organizationName || !metadata?.dashboardUrl) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Missing welcome metadata' }),
+            { 
+              status: 400, 
+              headers: { 
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              } 
+            }
+          )
+        }
+        
+        finalSubject = replaceTemplateVariables(EMAIL_TEMPLATES.welcome.subject, {
+          organizationName: metadata.organizationName
+        })
+        finalHtml = replaceTemplateVariables(EMAIL_TEMPLATES.welcome.html, {
+          organizationName: metadata.organizationName,
+          dashboardUrl: metadata.dashboardUrl
+        })
+        finalText = replaceTemplateVariables(EMAIL_TEMPLATES.welcome.text, {
+          organizationName: metadata.organizationName,
+          dashboardUrl: metadata.dashboardUrl
+        })
+        break
+
+      default:
+        // Custom email - use provided subject, html, and text
+        finalSubject = subject || 'Message from ScaleWize AI'
+        finalHtml = html || '<p>You have a message from ScaleWize AI</p>'
+        finalText = text || 'You have a message from ScaleWize AI'
     }
+
+    // Send email via SMTP
+    const messageId = await sendEmailViaSMTP(to, finalSubject, finalHtml, finalText)
+
+    // Log success (you can add database logging here)
+    console.log('Email sent successfully:', {
+      to,
+      subject: finalSubject,
+      type,
+      messageId,
+      timestamp: new Date().toISOString()
+    })
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        messageId: messageId,
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        } 
+      }
+    )
+
+  } catch (error) {
+    console.error('Email sending failed:', error)
+    
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message || 'Unknown error occurred',
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        } 
+      }
+    )
   }
-}
-
-// Main email service class
-export class EmailService {
-  private n8nService: N8nEmailService
-  private supabaseService: SupabaseEmailService
-
-  constructor() {
-    this.n8nService = new N8nEmailService()
-    this.supabaseService = new SupabaseEmailService()
-  }
-
-  async sendInvitationEmail(params: {
-    to: string
-    organizationName: string
-    inviterName: string
-    inviteUrl: string
-    expiresAt: string
-  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    // Try n8n first, fallback to Supabase
-    const result = await this.n8nService.sendInvitationEmail(params)
-    if (result.success) return result
-
-    console.log('Falling back to Supabase Auth for invitation email')
-    return this.supabaseService.sendInvitationEmail(params)
-  }
-
-  async sendWelcomeEmail(params: {
-    to: string
-    organizationName: string
-    dashboardUrl: string
-  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    // Try n8n first, fallback to Supabase
-    const result = await this.n8nService.sendWelcomeEmail(params)
-    if (result.success) return result
-
-    console.log('Falling back to Supabase Auth for welcome email')
-    return this.supabaseService.sendWelcomeEmail(params)
-  }
-}
-
-// Helper functions for easy use
-export const emailService = new EmailService()
-
-export const sendInvitationEmail = async (params: {
-  to: string
-  organizationName: string
-  inviterName: string
-  inviteUrl: string
-  expiresAt: string
-}) => {
-  return emailService.sendInvitationEmail(params)
-}
-
-export const sendWelcomeEmail = async (params: {
-  to: string
-  organizationName: string
-  dashboardUrl: string
-}) => {
-  return emailService.sendWelcomeEmail(params)
-}
+})
