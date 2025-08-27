@@ -1,0 +1,133 @@
+{
+  "name": "Dashboard Invitation Sending",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/send-email",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        -140
+      ],
+      "id": "4dd1827a-03fa-43f1-8af2-dee2c97e5e80",
+      "name": "Webhook",
+      "webhookId": "1dad8b5c-0e7c-4cca-8cde-60efe092917c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract data from webhook\nconst { type, to, subject, html, text, metadata } = $input.first().json;\n\n// Validate required fields\nif (!to || !subject || !html) {\n  throw new Error('Missing required fields: to, subject, html');\n}\n\n// Set email configuration based on type\nlet fromEmail, fromName, replyTo;\n\nswitch(type) {\n  case 'invitation':\n    fromEmail = 'admin@scalewize.ai';\n    fromName = 'ScaleWize AI';\n    replyTo = 'support@scalewize.ai';\n    break;\n  case 'welcome':\n    fromEmail = 'admin@scalewize.ai';\n    fromName = 'ScaleWize AI';\n    replyTo = 'support@scalewize.ai';\n    break;\n  default:\n    fromEmail = 'admin@scalewize.ai';\n    fromName = 'ScaleWize AI';\n    replyTo = 'support@scalewize.ai';\n}\n\n// Return processed data\nreturn {\n  to,\n  from: `${fromName} <${fromEmail}>`,\n  replyTo,\n  subject,\n  html,\n  text,\n  metadata,\n  type\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        100,
+        -140
+      ],
+      "id": "1fd2135c-63e9-45b7-9d29-5e0a9ae54b30",
+      "name": "Process Data"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "replyTo": "={{ $json.replyTo }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        -140
+      ],
+      "id": "fbb69873-cd40-40b1-934e-52d42ace1e15",
+      "name": "Send Email",
+      "webhookId": "4718f9c0-b3e5-4f28-977a-ec89ae30ad25",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Z2zdlM9yYjpKwHR1",
+          "name": "Gmail - tobias@scalewize.ai"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log successful email\nconsole.log('Email sent successfully:', {\n  to: $json.to,\n  subject: $json.subject,\n  type: $json.type,\n  timestamp: new Date().toISOString(),\n  messageId: $('Send Email').first().json.messageId || `n8n-${Date.now()}`\n});\n\n// Return success response\nreturn {\n  success: true,\n  messageId: $('Send Email').first().json.messageId || `n8n-${Date.now()}`,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        -140
+      ],
+      "id": "4d7d250a-170d-4bc9-bd57-269904ed4bfb",
+      "name": "Success Log"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log error details\nconsole.error('Email sending failed:', {\n  error: $json.error,\n  to: $json.to,\n  subject: $json.subject,\n  type: $json.type,\n  timestamp: new Date().toISOString()\n});\n\n// Return error response\nreturn {\n  success: false,\n  error: $json.error,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        -140
+      ],
+      "id": "5b5ec15a-a0ac-4b2d-8f92-5cd11147a605",
+      "name": "Error Handler"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Data": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Success Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "43e90f8e-d201-4d16-b4c2-31ff1848654d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b290958628946814704a7f34e4bcb09ce7f800f716bf502fc7e428d445869d39"
+  },
+  "id": "q5R6q0V3imp3ytpL",
+  "tags": []
+}
