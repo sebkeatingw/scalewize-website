@@ -44,16 +44,28 @@ export async function POST(request: NextRequest) {
     const userId = userData.user.id
     console.log('User created successfully:', userId)
 
-    // Create organization
+    // Generate slug from organization name
+    const slug = organizationName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single
+      .trim('-') // Remove leading/trailing hyphens
+
+    console.log('Generated slug:', slug)
+
+    // Create organization with proper slug
     const { data: orgData, error: orgError } = await supabaseAdmin
       .from('organizations')
       .insert({
         name: organizationName,
+        slug: slug, // Add the generated slug
         subscription_status: 'trial',
         plan_type: 'starter',
         max_users: 50,
         max_chat_sessions: 1000,
-        monthly_token_limit: 100000
+        monthly_token_limit: 100000,
+        created_by: userId // Set the created_by field
       })
       .select()
       .single()
@@ -63,7 +75,7 @@ export async function POST(request: NextRequest) {
       // Clean up user if org creation fails
       await supabaseAdmin.auth.admin.deleteUser(userId)
       return NextResponse.json(
-        { error: 'Failed to create organization' },
+        { error: 'Failed to create organization: ' + orgError.message },
         { status: 500 }
       )
     }
